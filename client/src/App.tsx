@@ -165,7 +165,9 @@ function App() {
       pcRef.current.close();
     }
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] // Public STUN server
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: "turn:turn:213.23.236.27:993?transport=tcp", username: "a", credential: "a"}]
     });
     pcRef.current = pc;
 
