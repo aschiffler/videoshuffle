@@ -23,14 +23,10 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install --omit=dev
 
-# Copy the server source code
-COPY . .
-
-# Copy the entrypoint script
-COPY entrypoint.sh .
-
-# Make the entrypoint script executable
-RUN chmod +x entrypoint.sh
+# Copy only the necessary server files, preserving the installed node_modules
+COPY index.js ./
+COPY entrypoint.sh ./
+COPY certs ./certs/
 
 # Copy the built React app from the client-builder stage
 COPY --from=client-builder /app/client/dist ./public
@@ -39,7 +35,7 @@ COPY --from=client-builder /app/client/dist ./public
 EXPOSE 3000
 
 # Set the entrypoint script to run on container start
-ENTRYPOINT [ "./entrypoint.sh" ]
+ENTRYPOINT [ "sh", "./entrypoint.sh" ]
 
 # The default command to start the server, passed to the entrypoint
 CMD [ "node", "index.js" ]
