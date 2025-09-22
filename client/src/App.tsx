@@ -32,6 +32,30 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('Tab is visible again.');
+
+        // Attempt to play videos in case they were paused by the browser
+        remoteVideoRef.current?.play().catch(e => console.error("Error resuming remote video:", e));
+        localVideoRef.current?.play().catch(e => console.error("Error resuming local video:", e));
+
+        // If we were in a session but are now disconnected, try to reconnect.
+        if (sessionCode && participantName && !isConnected && !isConnecting) {
+          console.log('Connection lost, attempting to reconnect...');
+          startSession();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isConnected, isConnecting, sessionCode, participantName]); // Rerun if these state variables change
+
   const startSession = async () => {
     if (!sessionCode || !participantName) {
       alert('Please enter a session code and your name.');
@@ -250,7 +274,7 @@ function App() {
                 Leave
               </button>
             </div>
-            <div className="relative w-full bg-black rounded-lg shadow-lg overflow-hidden">
+            <div className="relative w-full bg-black rounded-lg shadow-lg overflow-hidden max-h-[50vh]">
               <video ref={remoteVideoRef} className="w-full h-auto" autoPlay playsInline></video>
               {partnerName && <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded-md">{partnerName}</div>}
             </div>
