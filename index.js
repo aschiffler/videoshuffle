@@ -50,7 +50,6 @@ wss.on('connection', ws => {
     ws.on('message', message => {
         const data = JSON.parse(message);
         // ... (rest of your WebSocket message handling logic remains the same)
-        console.log(data)
         switch (data.type) {
             case 'joinSession':
                 const { sessionCode, participantName } = data.payload;
@@ -73,7 +72,6 @@ wss.on('connection', ws => {
                 }
                 break;
             case 'webrtc-signal':
-                console.log(data)
                 const { to, signal } = data.payload;
                 const recipient = sessions[ws.sessionCode]?.participants[to]?.socket;
                 if (recipient) {
