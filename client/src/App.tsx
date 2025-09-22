@@ -274,9 +274,9 @@ function App() {
                 Leave
               </button>
             </div>
-            <div className="relative w-full bg-black rounded-lg shadow-lg overflow-hidden max-h-[50vh]">
-              <video ref={remoteVideoRef} className="w-full h-auto" autoPlay playsInline></video>
-              {partnerName && <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded-md">{partnerName}</div>}
+            <div className="relative w-full h-[65vh] bg-black rounded-lg shadow-lg overflow-hidden">
+              <video ref={remoteVideoRef} className="w-full h-full object-contain" autoPlay playsInline></video>
+              {partnerName && <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded-md">{partnerName}</div>}
             </div>
             <video ref={localVideoRef} className="w-48 h-auto rounded-lg shadow-lg self-center" autoPlay muted playsInline></video>
           </div>
