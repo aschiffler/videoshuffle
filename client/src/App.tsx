@@ -19,6 +19,7 @@ function App() {
   const [partnerName, setPartnerName] = useState<string>('');
   const [statusMessage, setStatusMessage] = useState<string>('Waiting for connection...');
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -47,6 +48,19 @@ function App() {
       }
     };
   }, []); // Empty dependency array ensures this runs only once on mount.
+
+  useEffect(() => {
+    // Effect to automatically clear the toast message after a few seconds
+    if (toastMessage) {
+      const timer = setTimeout(() => {
+        setToastMessage(null);
+      }, 2000); // Toast visible for 4 seconds
+
+      return () => {
+        clearTimeout(timer);
+      };
+    }
+  }, [toastMessage]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -236,6 +250,13 @@ function App() {
     // 4. Handle ICE candidates
     pc.onicecandidate = event => {
       if (event.candidate && wsRef.current) {
+        // Inspect the candidate to show a toast about the server type
+        if (event.candidate.candidate.includes(' typ relay ')) {
+          setToastMessage('Using TURN relay server for connection.');
+        } else if (event.candidate.candidate.includes(' typ srflx ')) {
+          setToastMessage('Using STUN server to find path.');
+        }
+
         wsRef.current.send(JSON.stringify({
           type: 'webrtc-signal',
           payload: { to: newPartnerId, signal: { candidate: event.candidate } }
@@ -259,6 +280,12 @@ function App() {
 
   return (
     <div className="App bg-gray-900 text-white min-h-screen flex flex-col">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-5 right-5 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-xl z-50">
+          {toastMessage}
+        </div>
+      )}
       <header className="py-4">
         <h1 className="text-2xl text-orange-600 md:text-3xl font-bold text-center">UNINOVIS Video Shuffle</h1>
       </header>
