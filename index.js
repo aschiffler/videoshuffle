@@ -44,15 +44,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // WebSocket connection handling
 wss.on('connection', ws => {
-    ws.id = uuidv4();
-    console.log(`New participant connected with ID: ${ws.id}`);
-
     ws.on('message', message => {
         const data = JSON.parse(message);
-        // ... (rest of your WebSocket message handling logic remains the same)
         switch (data.type) {
             case 'joinSession':
-                const { sessionCode, participantName } = data.payload;
+                const { sessionCode, participantName, participantId } = data.payload; // Destructure participantId
+                ws.id = participantId;
+                console.log(`New participant connected with ID: ${ws.id}`);
                 if (!sessions[sessionCode]) {
                     sessions[sessionCode] = {
                         participants: {},
@@ -64,7 +62,9 @@ wss.on('connection', ws => {
                 ws.sessionCode = sessionCode; // Store session code on the websocket connection
                 console.log(`Participant ${participantName} joined session ${sessionCode}`);
 
-                const participantList = Object.values(sessions[sessionCode].participants).map(p => p.name);
+                const participantList = Object.entries(sessions[sessionCode].participants).map(([id, p]) => {
+                    return { id, name: p.name };
+                });
                 broadcastToSession(sessionCode, { type: 'participantListUpdate', payload: participantList });
 
                 if (Object.keys(sessions[sessionCode].participants).length >= 2) {
@@ -93,7 +93,9 @@ wss.on('connection', ws => {
                     console.log(`Session ${sessionCode} closed.`);
                 } else {
                     // Broadcast the updated participant list to the remaining members
-                    const participantList = Object.values(sessions[sessionCode].participants).map(p => p.name);
+                    const participantList = Object.entries(sessions[sessionCode].participants).map(([id, p]) => {
+                        return { id, name: p.name };
+                    });
                     broadcastToSession(sessionCode, { type: 'participantListUpdate', payload: participantList });
                     if (Object.keys(sessions[sessionCode].participants).length > 1) {
                         initiateShuffleCycle(sessionCode);
@@ -165,10 +167,11 @@ function initiateShuffleCycle(sessionCode) {
 
     // If there are more than 2 participants, start the recurring shuffle timer
     if (Object.keys(session.participants).length > 2) {
+        console.log("Timer started")
         session.timer = setInterval(() => {
             broadcastToSession(sessionCode, { type: 'shuffle-countdown', payload: { duration: 10 } });
             setTimeout(() => performShuffle(sessionCode), 3000); // Shuffle after a 3s delay to show countdown
-        }, 10000*60); // Cycle repeats every 10 minutes
+        }, 1000*60); // Cycle repeats every 1 minute
     }
 }
 

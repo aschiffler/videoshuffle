@@ -1,16 +1,21 @@
 // App.tsx
 
 import { useState, useEffect, useRef } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { WEBSOCKET_URL } from './config';
 import './App.css';
+
+interface Participant {
+  id: string;
+  name: string;
+}
 
 function App() {
   const [sessionCode, setSessionCode] = useState<string>('');
   const [participantName, setParticipantName] = useState<string>('');
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [partnerId, setPartnerId] = useState<string | null>(null);
-  const [_, setParticipants] = useState<string[]>([]); // New state for participants
+  const [participants, setParticipants] = useState<Participant[]>([]); // New state for participants
   const [partnerName, setPartnerName] = useState<string>('');
   const [statusMessage, setStatusMessage] = useState<string>('Waiting for connection...');
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -20,8 +25,19 @@ function App() {
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const participantIdRef = useRef<string | null>(null);
+  const partnerIdRef = useRef<string | null>(null); // Use a ref for the partner ID
 
   useEffect(() => {
+    // This effect runs once on component mount to establish a persistent client ID.
+    // It checks localStorage for an ID, and if not found, creates and saves one.
+    let clientId = localStorage.getItem('participantId');
+    if (!clientId) {
+      clientId = uuidv4();
+      localStorage.setItem('participantId', clientId);
+    }
+    participantIdRef.current = clientId;
+
     return () => {
       // Cleanup on component unmount
       if (wsRef.current) wsRef.current.close();
@@ -30,7 +46,7 @@ function App() {
         localStreamRef.current.getTracks().forEach(track => track.stop());
       }
     };
-  }, []);
+  }, []); // Empty dependency array ensures this runs only once on mount.
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -80,7 +96,7 @@ function App() {
           setIsConnected(true);
           ws.send(JSON.stringify({
             type: 'joinSession',
-            payload: { sessionCode, participantName }
+            payload: { sessionCode, participantName, participantId: participantIdRef.current }
           }));
         };
 
@@ -94,10 +110,10 @@ function App() {
           switch (data.type) {
             case 'shuffle':
               const { partnerId: newPartnerId, partnerName: newPartnerName, polite } = data.payload;
-              console.log(`Shuffling to new partner: ${newPartnerId} (${newPartnerName}). Polite: ${polite}`);
               setStatusMessage(`Connected to ${newPartnerName}!`);
-              setPartnerId(newPartnerId);
+              partnerIdRef.current = newPartnerId; // Set the ref value
               setPartnerName(newPartnerName);
+              console.log(`Shuffling to new partner: ${newPartnerId} (${newPartnerName}). Polite: ${polite}`);
               // The "impolite" peer (polite=false) will initiate the connection.
               await handleWebRTCConnection(newPartnerId, polite, stream); // Pass the stream directly
               break;
@@ -134,16 +150,19 @@ function App() {
               }, 1000);
               break;
             case 'participantListUpdate':
-              // When the participant list updates, it might be because our partner left.
-              // We reset the partner state and wait for a new 'shuffle' message.
-              if (partnerId) {
-                setStatusMessage('Partner has left, finding a new one...');
-                setPartnerId(null);
+              const participantList: Participant[] = data.payload;
+              setParticipants(participantList);
+              console.log('Participants updated:', participantList);
+              console.log('Current Partner Id:', partnerIdRef.current);
+              // Check if our current partner has left the session.
+              if (partnerIdRef.current && !participantList.some(p => p.id === partnerIdRef.current)) {
+                console.log(`${partnerIdRef.current} has left.`);
+                setStatusMessage(`Partner (${partnerIdRef.current}) has left, finding a new one...`);
+                partnerIdRef.current = null;
                 setPartnerName('');
+                // Clear the remote video stream
                 if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
               }
-              setParticipants(data.payload);
-              console.log('Participants updated:', data.payload);
               break;
             default:
               console.log('Unhandled message type:', data.type);
@@ -154,7 +173,7 @@ function App() {
           console.log('WebSocket disconnected');
           setIsConnected(false);
           setIsConnecting(false);
-          setPartnerId(null);
+          partnerIdRef.current = null;
           setPartnerName('');
           setCountdown(null);
           setStatusMessage('Waiting for connection...');
@@ -190,7 +209,29 @@ function App() {
     }
     const pc = new RTCPeerConnection({
       iceServers: [
-        { urls: "turn:213.23.236.27:8080?transport=tcp", username: "a", credential: "a"}
+      {
+        urls: "stun:stun.relay.metered.ca:80",
+      },
+      {
+        urls: "turn:standard.relay.metered.ca:80",
+        username: "f97c9e46a4cc6afb03c2f424",
+        credential: "WOgdyaGkNQiXTAdB",
+      },
+      {
+        urls: "turn:standard.relay.metered.ca:80?transport=tcp",
+        username: "f97c9e46a4cc6afb03c2f424",
+        credential: "WOgdyaGkNQiXTAdB",
+      },
+      {
+        urls: "turn:standard.relay.metered.ca:443",
+        username: "f97c9e46a4cc6afb03c2f424",
+        credential: "WOgdyaGkNQiXTAdB",
+      },
+      {
+        urls: "turns:standard.relay.metered.ca:443?transport=tcp",
+        username: "f97c9e46a4cc6afb03c2f424",
+        credential: "WOgdyaGkNQiXTAdB",
+      }
       ]
     });
     pcRef.current = pc;
@@ -244,6 +285,7 @@ function App() {
               placeholder="Session Code"
               value={sessionCode}
               onChange={e => setSessionCode(e.target.value)}
+              maxLength={20}
               className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
             <input
@@ -251,6 +293,7 @@ function App() {
               placeholder="Your Name"
               value={participantName}
               onChange={e => setParticipantName(e.target.value)}
+              maxLength={20}
               className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
             <button
@@ -278,7 +321,17 @@ function App() {
               <video ref={remoteVideoRef} className="w-full h-full object-contain" autoPlay playsInline></video>
               {partnerName && <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded-md">{partnerName}</div>}
             </div>
-            <video ref={localVideoRef} className="w-48 h-auto rounded-lg shadow-lg self-center" autoPlay muted playsInline></video>
+            <div className="w-full max-w-5xl flex flex-row justify-center items-start gap-2 px-2">
+              <video ref={localVideoRef} className="w-48 h-auto rounded-lg shadow-lg" autoPlay muted playsInline></video>
+              <div className="w-48 text-left rounded-lg shadow-lg">
+                <h3 className="text-lg font-semibold text-gray-300 mb-2">Participants ({participants.length})</h3>
+                <ul className="bg-gray-800 rounded-lg p-3 text-sm text-gray-400 max-h-36 overflow-y-auto">
+                  {participants.map(p => (
+                    <li key={p.id} className="py-1 truncate">{p.id === participantIdRef.current ? `${p.name} (You)` : p.name}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </div>
         )}
       </main>
