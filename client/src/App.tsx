@@ -227,9 +227,9 @@ function App() {
         urls: "stun:stun.relay.metered.ca:80",
       },
       {
-        urls: "turns:standard.relay.metered.ca:443?transport=tcp",
-        username: "f97c9e46a4cc6afb03c2f424",
-        credential: "WOgdyaGkNQiXTAdB",
+        urls: "turns:videoshuffle.thws.education:80?transport=tcp",
+        username: "f97c9",
+        credential: "WOgdya",
       },
       ]
     });
