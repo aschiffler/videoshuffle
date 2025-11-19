@@ -29,6 +29,7 @@ function App() {
   const participantIdRef = useRef<string | null>(null);
   const partnerIdRef = useRef<string | null>(null); // Use a ref for the partner ID
   const initialConnectAttempted = useRef(false);
+  const iceRestarting = useRef(false); // Flag to prevent multiple ICE restarts
 
   useEffect(() => {
     // This effect runs once on component mount to establish a persistent client ID.
@@ -269,9 +270,51 @@ function App() {
       }
     };
 
+    // 6. Monitor ICE connection state for drops and recovery
+    pc.oniceconnectionstatechange = () => {
+      if (!pcRef.current) return;
+      console.log(`ICE Connection State: ${pcRef.current.iceConnectionState}`);
+      switch (pcRef.current.iceConnectionState) {
+        case 'disconnected':
+          // The connection has been lost. This might be temporary.
+          // An ICE restart might be needed if it doesn't recover.
+          setToastMessage('Connection lost, attempting to reconnect...');
+          break;
+        case 'failed':
+          // The connection has failed and will not recover on its own.
+          // We should initiate an ICE restart.
+          if (!iceRestarting.current) {
+            console.log("ICE connection failed, restarting ICE.");
+            iceRestarting.current = true;
+            setToastMessage('Connection failed, restarting...');
+            pc.createOffer({ iceRestart: true })
+              .then(offer => pc.setLocalDescription(offer))
+              .then(() => {
+                if (wsRef.current && pc.localDescription) {
+                  wsRef.current.send(JSON.stringify({
+                    type: 'webrtc-signal',
+                    payload: { to: newPartnerId, signal: { sdp: pc.localDescription } }
+                  }));
+                }
+              })
+              .finally(() => {
+                // Reset flag after a delay to prevent rapid restarts
+                setTimeout(() => iceRestarting.current = false, 5000);
+              });
+          }
+          break;
+        case 'connected':
+          // Connection is established and healthy.
+          setToastMessage(null); // Clear any reconnecting messages
+          iceRestarting.current = false; // Reset restart flag on successful connection
+          break;
+      }
+    };
+
     // 5. Create and send offer only if we are the "impolite" peer.
     // The "polite" peer will wait for an offer to arrive.
     if (!polite) {
+      iceRestarting.current = false; // Ensure flag is reset for new connections
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       if (wsRef.current) {
