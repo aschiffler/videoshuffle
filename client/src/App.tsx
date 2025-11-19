@@ -28,6 +28,7 @@ function App() {
   const localStreamRef = useRef<MediaStream | null>(null);
   const participantIdRef = useRef<string | null>(null);
   const partnerIdRef = useRef<string | null>(null); // Use a ref for the partner ID
+  const initialConnectAttempted = useRef(false);
 
   useEffect(() => {
     // This effect runs once on component mount to establish a persistent client ID.
@@ -38,7 +39,8 @@ function App() {
       localStorage.setItem('participantId', clientId);
     }
     participantIdRef.current = clientId;
-
+    setParticipantName(clientId.slice(0,7))
+    setSessionCode("A");
     return () => {
       // Cleanup on component unmount
       if (wsRef.current) wsRef.current.close();
@@ -48,6 +50,15 @@ function App() {
       }
     };
   }, []); // Empty dependency array ensures this runs only once on mount.
+
+  useEffect(() => {
+    // This effect triggers the initial session start once the session code and participant name are set.
+    // It ensures that startSession() is called with the correct, updated state values.
+    if (sessionCode && participantName && !isConnected && !isConnecting && !initialConnectAttempted.current) {
+      initialConnectAttempted.current = true; // Prevent re-triggering on subsequent state changes
+      startSession();
+    }
+  }, [sessionCode, participantName, isConnected, isConnecting]); // Dependencies ensure this runs when values are ready.
 
   useEffect(() => {
     // Effect to automatically clear the toast message after a few seconds
@@ -124,7 +135,7 @@ function App() {
           switch (data.type) {
             case 'shuffle':
               const { partnerId: newPartnerId, partnerName: newPartnerName, polite } = data.payload;
-              setStatusMessage(`Connected to ${newPartnerName}!`);
+              setStatusMessage(`Connected to ${newPartnerName}`);
               partnerIdRef.current = newPartnerId; // Set the ref value
               setPartnerName(newPartnerName);
               console.log(`Shuffling to new partner: ${newPartnerId} (${newPartnerName}). Polite: ${polite}`);
@@ -205,12 +216,6 @@ function App() {
       });
   };
 
-  const leaveSession = () => {
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-  };
-
   const handleWebRTCConnection = async (newPartnerId: string, polite: boolean, stream: MediaStream) => {
     if (!stream) {
       console.error("Local stream is not available.");
@@ -280,76 +285,19 @@ function App() {
 
   return (
     <div className="App bg-gray-900 text-white min-h-screen flex flex-col">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed top-5 right-5 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-xl z-50">
-          {toastMessage}
-        </div>
-      )}
-      <header className="py-4">
-        <h1 className="text-2xl text-orange-600 md:text-3xl font-bold text-center">UNINOVIS Video Shuffle</h1>
-      </header>
-      <main className="flex-grow flex items-center justify-center p-4">
-        {!isConnected ? (
-          <div className="lobby bg-gray-800 p-8 rounded-lg shadow-lg max-w-sm w-full flex flex-col gap-4">
-            <input
-              type="text"
-              placeholder="Session Code"
-              value={sessionCode}
-              onChange={e => setSessionCode(e.target.value)}
-              maxLength={20}
-              className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
-            <input
-              type="text"
-              placeholder="Your Name"
-              value={participantName}
-              onChange={e => setParticipantName(e.target.value)}
-              maxLength={20}
-              className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
-            <button
-              onClick={startSession}
-              disabled={isConnecting}
-              className="w-full p-3 bg-orange-600 rounded-md text-white font-bold hover:bg-orange-700 transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
-            >
-              {isConnecting ? 'Connecting...' : 'Start Session'}
-            </button>
-          </div>
-        ) : (
-          <div className="w-full max-w-5xl flex flex-col items-center gap-4">
-            <div className="w-full flex justify-between items-center px-2">
-              <div className="text-sm md:text-base text-gray-300">
-                {countdown !== null ? `Shuffling in ${countdown}...` : statusMessage}
-              </div>
-              <button 
-                className="px-4 py-2 bg-red-600 rounded-md text-white font-bold hover:bg-red-700 transition-colors" 
-                onClick={leaveSession}
-              >
-                Leave
-              </button>
-            </div>
-            <div className="relative w-full h-[65vh] bg-black rounded-lg shadow-lg overflow-hidden">
-              <video ref={remoteVideoRef} className="w-full h-full object-contain" autoPlay playsInline></video>
-              {partnerName && <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded-md">{partnerName}</div>}
-            </div>
-            <div className="w-full max-w-5xl flex flex-row justify-center items-start gap-2 px-2">
-              <video ref={localVideoRef} className="w-48 h-auto rounded-lg shadow-lg" autoPlay muted playsInline></video>
-              <div className="w-48 text-left rounded-lg shadow-lg">
-                <h3 className="text-lg font-semibold text-gray-300 mb-2">Participants ({participants.length})</h3>
-                <ul className="bg-gray-800 rounded-lg p-3 text-sm text-gray-400 max-h-36 overflow-y-auto">
-                  {participants.map(p => (
-                    <li key={p.id} className="py-1 truncate">{p.id === participantIdRef.current ? `${p.name} (You)` : p.name}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-      <footer className="py-4 text-center text-xs text-gray-500">
-        <p>&copy; {new Date().getFullYear()} plan.bee</p>
-      </footer>
+    {toastMessage && (
+      <div className="fixed top-5 right-5 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-xl z-50">
+        {toastMessage}
+      </div>
+    )}              
+      <div className="fixed inset-0 bg-black">
+        <video ref={remoteVideoRef} className="w-full h-full object-contain" autoPlay playsInline></video>
+      </div>
+      <div className="fixed top-5 left-5 text-sm md:text-base text-white bg-black bg-opacity-50 px-3 py-1 rounded-lg">
+        {countdown !== null ? `Shuffling in ${countdown}...` : statusMessage}
+      </div>
+      {/* Local video preview, small in the corner */}
+      <video ref={localVideoRef} className="fixed bottom-5 right-5 w-1/8 max-w-xs h-auto rounded-lg shadow-lg" autoPlay playsInline muted></video>
     </div>
   );
 }

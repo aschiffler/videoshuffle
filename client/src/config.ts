@@ -1,1 +1,1 @@
-export const WEBSOCKET_URL = import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:3000';
+export const WEBSOCKET_URL = import.meta.env.VITE_WEBSOCKET_URL || 'wss://videoshuffle.thws.education';
