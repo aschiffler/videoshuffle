@@ -15,8 +15,8 @@ function App() {
   const [participantName, setParticipantName] = useState<string>('');
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [participants, setParticipants] = useState<Participant[]>([]); // New state for participants
-  const [partnerName, setPartnerName] = useState<string>('');
+  const [, setParticipants] = useState<Participant[]>([]); // New state for participants
+  const [, setPartnerName] = useState<string>('');
   const [statusMessage, setStatusMessage] = useState<string>('Waiting for connection...');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
